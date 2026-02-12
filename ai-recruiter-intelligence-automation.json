@@ -1,0 +1,1181 @@
+{
+  "name": "My workflow 3",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "weeks",
+              "triggerAtHour": 9
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        -992,
+        -192
+      ],
+      "id": "6267dca4-7e3f-4001-b894-5576f0bc500f",
+      "name": "Schedule Trigger"
+    },
+    {
+      "parameters": {
+        "batchSize": "=1",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        -544,
+        -192
+      ],
+      "id": "71088ba4-bf2f-4b3a-82c2-e1a401e1161c",
+      "name": "Loop Over Items"
+    },
+    {
+      "parameters": {
+        "jsCode": "return [\n    { json: { sector: \"AI / ML\" } },\n  // { json: { sector: \"B2B SaaS\" } },\n\n  // { json: { sector: \"FinTech\" } },\n  // { json: { sector: \"E-commerce Tech\" } },\n  // { json: { sector: \"HealthTech\" } },\n  // { json: { sector: \"EdTech\" } },\n  // { json: { sector: \"IT Services\" } },\n  // { json: { sector: \"Cloud / Cybersecurity\" } }\n];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -768,
+        -192
+      ],
+      "id": "7c397442-80be-426c-90b9-353142f34600",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "query": "=\"\"{{ $json.sector }} compines hiring India\" ",
+        "options": {
+          "max_results": 15,
+          "time_range": "day",
+          "include_answer": "advanced"
+        }
+      },
+      "type": "@tavily/n8n-nodes-tavily.tavily",
+      "typeVersion": 1,
+      "position": [
+        -320,
+        -192
+      ],
+      "id": "f3c0e18b-8697-49b1-acc4-c01901cb9a97",
+      "name": "Search"
+      
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "models/gemini-2.5-flash",
+          "mode": "list",
+          "cachedResultName": "models/gemini-2.5-flash"
+        },
+        "messages": {
+          "values": [
+            {
+              "content": "=From the following summary, extract structured hiring information.\n\nReturn JSON array like this:\n\n[\n  {\n    \"company\": \"\",\n    \"roleType\": \"\",\n    \"location\": \"\",\n    \"notes\": \"\"\n  }\n]\n\nSummary:\n{{ $json.answer }}\n\nReturn only valid JSON.\n"
+            }
+          ]
+        },
+        "builtInTools": {},
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.googleGemini",
+      "typeVersion": 1.1,
+      "position": [
+        -96,
+        -192
+      ],
+      "id": "8424ef70-64d9-4c8c-ad09-831accbad68c",
+      "name": "Message a model"
+     
+    },
+    {
+      "parameters": {
+        "jsCode": "const rawText = $json.content.parts[0].text;\n\n// Remove markdown fences\nconst withoutFences = rawText\n  .replace(/```json/g, '')\n  .replace(/```/g, '')\n  .trim();\n\n// 🔥 Extract ONLY the first JSON array using regex\nconst match = withoutFences.match(/\\[[\\s\\S]*\\]/);\n\nif (!match) {\n  throw new Error(\"No valid JSON array found in model output.\");\n}\n\nlet parsed;\n\ntry {\n  parsed = JSON.parse(match[0]);\n} catch (error) {\n  throw new Error(\"JSON parsing failed: \" + error.message);\n}\n\nreturn parsed.map(item => ({\n  json: item\n}));\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        256,
+        -128
+      ],
+      "id": "a32c9577-0e97-49d5-bff2-a0d24941e357",
+      "name": "Code in JavaScript1"
+    },
+    {
+      "parameters": {
+        "query": "=\"{{ $json.company }} HR recruiter Talent Acquisition LinkedIn India\"",
+        "options": {
+          "max_results": 5,
+          "include_answer": "advanced"
+        }
+      },
+      "type": "@tavily/n8n-nodes-tavily.tavily",
+      "typeVersion": 1,
+      "position": [
+        -320,
+        -384
+      ],
+      "id": "606447fb-6753-4150-823c-ffbbaf620a4d",
+      "name": "Search1"
+    },
+    {
+      "parameters": {
+        "jsCode": "const allItems = $input.all();\nlet linkedinProfiles = [];\n\nfor (const item of allItems) {\n  const results = item.json.results || [];\n\n  const filtered = results.filter(result =>\n    result.url?.includes(\"linkedin.com/in/\")\n  );\n\n  linkedinProfiles.push(...filtered);\n}\n\nfunction calculateScore(profile) {\n  const title = (profile.title || \"\").toLowerCase();\n  const snippet = (profile.content || \"\").toLowerCase();\n\n  let score = 0;\n\n  // 🔹 Strong signals in TITLE (higher weight)\n  if (title.includes(\"talent acquisition\")) score += 4;\n  if (title.includes(\"recruiter\")) score += 4;\n  if (title.includes(\"hiring\")) score += 3;\n  if (title.includes(\"technical recruiter\")) score += 5;\n\n  if (title.includes(\"manager\")) score += 4;\n  if (title.includes(\"lead\")) score += 3;\n  if (title.includes(\"partner\")) score += 3;\n  if (title.includes(\"director\")) score += 5;\n  if (title.includes(\"head\")) score += 5;\n\n  // 🔹 Signals in SNIPPET (lower weight but still useful)\n  if (snippet.includes(\"talent acquisition\")) score += 2;\n  if (snippet.includes(\"technical hiring\")) score += 3;\n  if (snippet.includes(\"product hiring\")) score += 3;\n  if (snippet.includes(\"engineering hiring\")) score += 3;\n  if (snippet.includes(\"tech hiring\")) score += 3;\n\n  // 🔹 Penalize wrong roles\n  if (title.includes(\"hr ops\")) score -= 3;\n  if (title.includes(\"hr operations\")) score -= 3;\n  if (title.includes(\"generalist\")) score -= 2;\n  if (title.includes(\"payroll\")) score -= 4;\n  if (title.includes(\"admin\")) score -= 4;\n\n  return score;\n}\n\n// Remove duplicates by LinkedIn URL\nconst uniqueProfiles = [\n  ...new Map(\n    linkedinProfiles.map(p => [p.url, p])\n  ).values()\n];\n\nreturn uniqueProfiles\n  .map(profile => {\n    const autoScore = calculateScore(profile);\n\n    // Reject very weak profiles\n    if (autoScore < 3) return null;\n\n    return {\n      json: {\n        name: profile.title?.split(\" - \")[0] || \"\",\n        company: profile.title?.split(\" - \")[1] || \"\",\n        linkedin: profile.url,\n        snippet: profile.content || \"\",\n        autoScore,\n\n        validationStatus:\n          autoScore >= 7\n            ? \"auto_confirmed\"\n            : \"pending\",\n\n        outreachStatus: \"not_contacted\",\n        createdAt: new Date().toISOString()\n      }\n    };\n  })\n  .filter(Boolean);\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -32,
+        -384
+      ],
+      "id": "04ebc055-77b5-4d8a-bc93-b0af7d3f8baf",
+      "name": "Code in JavaScript2"
+    },
+    {
+      "parameters": {
+        "operation": "insert",
+        "collection": "check1",
+        "fields": "name,company,linkedin,snippet,autoScore,validationStatus,outreachStatus,createdAt",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.mongoDb",
+      "typeVersion": 1.2,
+      "position": [
+        704,
+        -384
+      ],
+      "id": "fe5bbbec-593a-41d9-a3cf-0d73a70156e6",
+      "name": "Insert documents"
+    },
+    {
+      "parameters": {
+        "collection": "check1",
+        "options": {},
+        "query": "={\n  \n\"linkedin\": \"{{ $json.linkedin }}\"\n} "
+      },
+      "type": "n8n-nodes-base.mongoDb",
+      "typeVersion": 1.2,
+      "position": [
+        256,
+        -384
+      ],
+      "id": "4618f8ad-8244-46d3-8def-01d56d2a487c",
+      "name": "Find documents",
+      "alwaysOutputData": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Get recruiter data from previous scoring node\nconst newData = $('Code in JavaScript2').all().map(item => item.json);\n\n// Get existing DB records (from MongoDB Find node)\nconst existingData = $input.all().map(item => item.json);\n\n// Create set of existing LinkedIn URLs\nconst existingLinkedins = new Set(\n  existingData.map(doc => doc.linkedin)\n);\n\n// Filter only profiles NOT already in DB\nconst filtered = newData.filter(profile =>\n  !existingLinkedins.has(profile.linkedin)\n);\n\n// Return only new ones\nreturn filtered.map(profile => ({\n  json: profile\n}));\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        480,
+        -384
+      ],
+      "id": "16f6a42c-66a6-4a0b-949e-cbd18072a586",
+      "name": "Code in JavaScript3"
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "models/gemini-2.5-flash",
+          "mode": "list",
+          "cachedResultName": "models/gemini-2.5-flash"
+        },
+        "messages": {
+          "values": [
+            {
+              "content": "=You are writing a professional LinkedIn message from the Verifide team.\n\nPrevious Conversation (if any):\n{{$json.formattedHistory || \"No previous conversation.\" }}\n\n\n\nRecruiter Name: {{ $json.name }}\nCompany: {{ $json.company }}\n\nAbout Verifide:\nVerifide is built on a simple idea — students deserve real-world clarity before they enter the real world. \nWe connect students, colleges, and industry professionals — helping young talent understand how the tech industry is evolving, what skills truly matter, and how to build meaningful, future-ready careers. \nThrough conversations, curated insights, mentorship opportunities, and community learning, Verifide bridges the gap between what’s taught and what’s actually practiced in the industry.\n\nTask:\nGenerate the next LinkedIn message based on the previous conversation.\n\nRules:\n- Keep it under 120 words\n- Sound human and professional\n- Not salesy\n- Not robotic\n- Personalize lightly\n- End with a soft call to action\n- If no previous conversation, write a first outreach message\n- If previous message exists, write a natural follow-up (not repetitive)\n\nReturn only the message text.\n"
+            }
+          ]
+        },
+        "builtInTools": {},
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.googleGemini",
+      "typeVersion": 1.1,
+      "position": [
+        1984,
+        -224
+      ],
+      "id": "ed5d6a34-d50b-43b3-a574-befbfb39f233",
+      "name": "Message a model1"
+    },
+    {
+      "parameters": {
+        "collection": "check1",
+        "options": {},
+        "query": "={  \"validationStatus\":\"auto_confirmed\" }"
+      },
+      "type": "n8n-nodes-base.mongoDb",
+      "typeVersion": 1.2,
+      "position": [
+        848,
+        -224
+      ],
+      "id": "a4944495-35d7-4e8d-abbd-7c06d6c81953",
+      "name": "Find documents1",
+      "executeOnce": false,
+      "alwaysOutputData": true,
+      
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Recruiter data from first Mongo node (check1)\nconst recruiters = $('Find documents1').all().map(item => item.json);\n\n// Chat data from second Mongo node (recruiter_chats)\nconst chats = $input.all().map(item => item.json);\n\n// Create map for quick lookup by linkedin\nconst chatMap = new Map();\n\nfor (const chat of chats) {\n  if (chat.linkedin) {\n    chatMap.set(chat.linkedin, chat);\n  }\n}\n\n// Merge both datasets\nconst merged = recruiters.map(recruiter => {\n\n  const chatData = chatMap.get(recruiter.linkedin);\n\n  return {\n    json: {\n      ...recruiter,\n      messages: chatData?.messages || [],\n      conversationStatus: chatData?.status || \"no_conversation\",\n      lastMessageAt: chatData?.lastMessageAt || null\n    }\n  };\n});\n\nreturn merged;\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1296,
+        -224
+      ],
+      "id": "e86c4d9d-ef45-4797-9d2e-e2eefb91e6be",
+      "name": "Code in JavaScript4"
+    },
+    {
+      "parameters": {
+        "collection": "recruiter_chats",
+        "options": {},
+        "query": "={\"linkedin\":\"{{ $json.linkedin }}\"}"
+      },
+      "type": "n8n-nodes-base.mongoDb",
+      "typeVersion": 1.2,
+      "position": [
+        1072,
+        -224
+      ],
+      "id": "a5f97940-873b-4701-8b6f-76cc2c135894",
+      "name": "Find documents2",
+      "alwaysOutputData": true,
+   
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        1520,
+        -224
+      ],
+      "id": "99155d0f-dd7e-424e-9ad5-39b626909911",
+      "name": "Loop Over Items1"
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\n\nreturn items.map(item => {\n\n  const data = item.json;\n  const messages = data.messages || [];\n\n  // Detect conversation stage\n  let conversationStage = \"first_outreach\";\n\n  if (messages.length > 0) {\n    const lastMessage = messages[messages.length - 1];\n\n    if (lastMessage.role === \"verifide\") {\n      conversationStage = \"follow_up\";\n    }\n\n    if (lastMessage.role === \"recruiter\") {\n      conversationStage = \"reply_received\";\n    }\n  }\n\n  // Format conversation history for AI\n  const formattedHistory = messages.length\n    ? messages\n        .map(m => `${m.role.toUpperCase()}: ${m.text}`)\n        .join(\"\\n\\n\")\n    : \"No previous conversation.\";\n\n  return {\n    json: {\n      ...data,\n      conversationStage,\n      formattedHistory,\n      lastMessageRole: messages.length\n        ? messages[messages.length - 1].role\n        : null,\n      totalMessages: messages.length\n    }\n  };\n});\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1744,
+        -208
+      ],
+      "id": "fff86012-a853-451c-8d7a-a84b4b8244a7",
+      "name": "Code in JavaScript6"
+    },
+    {
+      "parameters": {
+        "operation": "syncConversation",
+        "personUrl": "={{ $json.linkedin }}"
+      },
+      "type": "n8n-nodes-linked-api.linkedApi",
+      "typeVersion": 1,
+      "position": [
+        448,
+        1600
+      ],
+      "id": "e80462d1-e9a5-4fa3-a2d2-b7f6fb33fc1c",
+      "name": "Sync conversation"
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "hoursInterval": 2
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        -144,
+        1280
+      ],
+      "id": "5c0dd0b2-0eff-498e-b078-b81f84e558af",
+      "name": "Schedule Trigger2"
+    },
+    {
+      "parameters": {
+        "collection": "recruiter_chats",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.mongoDb",
+      "typeVersion": 1.2,
+      "position": [
+        32,
+        1296
+      ],
+      "id": "2d52e4ca-4e90-459a-bbb7-74b456fa1b81",
+      "name": "Find documents3"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        240,
+        1296
+      ],
+      "id": "415d8774-bc0d-4080-8351-dac0690a18c1",
+      "name": "Loop Over Items2"
+    },
+    {
+      "parameters": {
+        "jsCode": "return [\n  {\n    json: {\n      success: true,\n      result: [\n        {\n          personUrl: $json.linkedin,\n          since: \"2023-01-01T00:00:00Z\",\n          type: \"st\",\n          messages: [\n            {\n              id: \"1\",\n              sender: \"us\",\n              text: \"Hello, how are you?\",\n              time: \"2023-01-02T10:30:00Z\"\n            },\n            {\n              id: \"2\",\n              sender: \"them\",\n              text: \"I'm doing well, thanks!\",\n              time: \"2023-01-02T10:35:00Z\"\n            }\n          ]\n        }\n      ]\n    }\n  }\n];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        464,
+        1376
+      ],
+      "id": "6c448c90-0fec-4b80-96f2-2b51689148f5",
+      "name": "Code in JavaScript7"
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\n\nconst output = [];\n\nfor (const item of items) {\n  const data = item.json;\n\n  if (!data.result || !data.result.length) continue;\n\n  const conversation = data.result[0];\n  const messages = conversation.messages || [];\n\n  if (!messages.length) continue;\n\n  const lastMessage = messages[messages.length - 1];\n\n  // ✅ Select only when last message is from \"them\"\n  if (lastMessage.sender === \"them\") {\n    output.push({\n      json: data\n    });\n  }\n}\n\nreturn output;\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        512,
+        1184
+      ],
+      "id": "4aef3571-fad8-497e-b01f-fd32b104a87e",
+      "name": "Code in JavaScript8",
+      "alwaysOutputData": false
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        736,
+        1248
+      ],
+      "id": "9da28ede-0215-415a-8d99-efe1fe452245",
+      "name": "Loop Over Items3"
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\nconst output = [];\n\nfor (const item of items) {\n  const data = item.json;\n\n  if (!data.result || !data.result.length) continue;\n\n  const conversation = data.result[0];\n  const messages = conversation.messages || [];\n\n  if (!messages.length) continue;\n\n  const lastMessage = messages[messages.length - 1];\n\n  if (lastMessage.sender !== \"them\") continue;\n\n  // 🎲 Pure random 50/50 decision\n  const isMeeting = Math.random() < 0.5;\n\n  if (isMeeting) {\n\n    const startDate = new Date();\n    startDate.setDate(startDate.getDate() + 2);\n    startDate.setHours(15, 0, 0, 0);\n\n    const endDate = new Date(startDate);\n    endDate.setMinutes(endDate.getMinutes() + 30);\n\n    output.push({\n      json: {\n        action: \"create_meeting\",\n        personUrl: conversation.personUrl,\n        meeting: {\n          title: \"Introductory Discussion - Verifide\",\n          start: startDate.toISOString(),\n          end: endDate.toISOString(),\n          meetLink: \"https://meet.fake/verifide-demo\"\n        }\n      }\n    });\n\n  } else {\n\n    output.push({\n      json: {\n        action: \"send_message\",\n        personUrl: conversation.personUrl,\n        message:\n          \"I’d love to continue this conversation. Would sometime later this week work for a quick 20–30 minute call?\"\n      }\n    });\n\n  }\n}\n\nreturn output;\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1136,
+        1376
+      ],
+      "id": "f6077358-1dea-4a9f-b60b-1fc73c86ca0f",
+      "name": "Code in JavaScript9"
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "models/gemini-2.5-pro",
+          "mode": "list",
+          "cachedResultName": "models/gemini-2.5-pro"
+        },
+        "messages": {
+          "values": [
+            {
+              "content": "You are an outreach assistant managing LinkedIn conversations.\n\nAnalyze the recruiter's latest message and decide the next action.\n\nRules:\n\n1. If the message is clearly positive AND includes a specific date and time,\n   call the Google Calendar tool to create a 30-minute meeting with a Google Meet link.\n\n2. If the message is positive but no specific time is mentioned,\n   schedule a 30-minute meeting 2 days from now at 3:00 PM.\n\n3. If the message is neutral or unclear,\n   respond with a gentle message asking for availability.\n\n4. If the message is negative,\n   respond politely and keep the door open.\n\nImportant:\n- Either call the tool OR send a message.\n- Never do both.\n- When calling the tool, use ISO 8601 format for start and end time.\n"
+            }
+          ]
+        },
+        "builtInTools": {},
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.googleGemini",
+      "typeVersion": 1.1,
+      "position": [
+        976,
+        1600
+      ],
+      "id": "9841eb03-3cb6-43e9-af87-c808c5c120f3",
+      "name": "Message a model2"
+    },
+    {
+      "parameters": {
+        "calendar": {
+          "__rl": true,
+          "value": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Calendar', ``, 'string') }}",
+          "mode": "id",
+          "__regex": "(^[a-zA-Z0-9.!#$%&’*+/=?^_`{|}~-]+@[a-zA-Z0-9-]+(?:\\.[a-zA-Z0-9-]+)*)"
+        },
+        "start": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Start', ``, 'string') }}",
+        "end": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('End', ``, 'string') }}",
+        "useDefaultReminders": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Use_Default_Reminders', ``, 'boolean') }}",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.googleCalendarTool",
+      "typeVersion": 1.3,
+      "position": [
+        1088,
+        1792
+      ],
+      "id": "7b3a5cdd-b8b4-4d30-93d7-3aa6406866b7",
+      "name": "Create an event in Google Calendar"
+    },
+    {
+      "parameters": {
+        "operation": "sendMessage",
+        "personUrl": "={{ $('Loop Over Items1').item.json.linkedin }}",
+        "messageText": "={{ $json.content.parts[0].text }}"
+      },
+      "type": "n8n-nodes-linked-api.linkedApi",
+      "typeVersion": 1,
+      "position": [
+        1008,
+        1024
+      ],
+      "id": "37f00b97-8515-411d-83ff-631330d23b96",
+      "name": "Send message1"
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "collection": "recruiter_chats",
+        "updateKey": "=linkedin",
+        "fields": "messages",
+        "upsert": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.mongoDb",
+      "typeVersion": 1.2,
+      "position": [
+        1696,
+        1328
+      ],
+      "id": "76a89a44-4c5f-4643-a782-1351502aad49",
+      "name": "Update documents1",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "de516143-f3ce-455f-b318-236f5f4a11f2",
+              "leftValue": "={{ $json.action }}",
+              "rightValue": "create_meeting",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        992,
+        1200
+      ],
+      "id": "aac5b0fb-edde-4751-94f0-58c90bf0e81f",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\nconst output = [];\n\n// Get all previous chats\nconst previousChats = $('Find documents3').all().map(i => i.json);\n\n// Create lookup map by linkedin\nconst chatMap = new Map();\nfor (const chat of previousChats) {\n  chatMap.set(chat.linkedin, chat);\n}\n\nfor (const item of items) {\n\n  const data = item.json;\n\n  if (data.action !== \"send_message\") continue;\n\n  const previousChat = chatMap.get(data.personUrl) || {};\n  const previousMessages = previousChat.messages || [];\n\n  output.push({\n    json: {\n      linkedin: data.personUrl,\n      recruiterName: previousChat.recruiterName || \"\",\n      createdAt: previousChat.createdAt || new Date().toISOString(),\n      lastMessageAt: new Date().toISOString(),\n      status: \"contacted\",\n      messages: [\n        ...previousMessages,\n        {\n          role: \"verifide\",\n          text: data.message,\n          sentAt: new Date().toISOString()\n        }\n      ]\n    }\n  });\n\n}\n\nreturn output;\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1424,
+        1360
+      ],
+      "id": "9204f191-9c9c-434b-a985-2fb480bcd8af",
+      "name": "Code in JavaScript10"
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "collection": "check1",
+        "updateKey": "linkedin",
+        "fields": " validationStatus",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.mongoDb",
+      "typeVersion": 1.2,
+      "position": [
+        1536,
+        1104
+      ],
+      "id": "2364a422-2538-4d94-9a2d-95e0b0574db3",
+      "name": "Update documents2"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "af02dda5-09c6-4a4f-ba6f-abb57e33cc66",
+              "name": "validationStatus",
+              "value": "joined_us_or_in_meeting",
+              "type": "string"
+            },
+            {
+              "id": "eca5575f-45f4-47f7-bccb-0a81fd61daf1",
+              "name": "linkedin",
+              "value": "={{ $json.personUrl }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1280,
+        1104
+      ],
+      "id": "bed6485c-5c6f-4dce-a40d-2e47b38a8740",
+      "name": "Edit Fields"
+    },
+    {
+      "parameters": {
+        "content": "#  Hiring Intelligence & Recruiter Discovery\n\nThis workflow runs weekly to identify actively hiring companies \nand extract relevant recruiters for outreach.\n\nSTEP 1 — Sector Initialization\n• A Code node defines target sectors (AI/ML, SaaS, FinTech, etc.)\n\nSTEP 2 — Hiring Company Detection\n• Tavily searches for companies hiring in India.\n• Gemini extracts structured hiring data from raw search results.\n• Response is parsed into clean JSON format.\n\nSTEP 3 — Recruiter Identification\n• Tavily searches for HR / Talent Acquisition professionals \n  at identified companies.\n• A scoring system filters only relevant recruiter profiles.\n• Weak or irrelevant HR profiles are discarded.\n\nSTEP 4 — Database Validation\n• MongoDB checks if recruiter already exists.\n• Only new and qualified recruiters are stored.\n• Status is assigned (auto_confirmed / pending).\n\nResult:\nA clean, validated recruiter database ready for outreach.\n",
+        "height": 608,
+        "width": 752
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -320,
+        -1072
+      ],
+      "typeVersion": 1,
+      "id": "157a6070-c0c8-4378-b926-ae6b1b0c4367",
+      "name": "Sticky Note"
+    },
+    {
+      "parameters": {
+        "content": "# End-to-End Recruiter Discovery & Outreach System",
+        "height": 112,
+        "width": 1248
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        256,
+        288
+      ],
+      "typeVersion": 1,
+      "id": "cba84eb5-5f2b-48ee-8d73-cd6aa4dacc7f",
+      "name": "Sticky Note1"
+    },
+    {
+      "parameters": {
+        "content": "# AI Outreach & Conversation Lifecycle\n\nThis workflow manages personalized recruiter outreach \nand maintains conversation memory.\n\nSTEP 1 — Fetch Confirmed Recruiters\n• Pull recruiters marked as auto_confirmed.\n• Retrieve previous chat history from recruiter_chats.\n\nSTEP 2 — Conversation Intelligence\n• Detect conversation stage:\n  - First outreach\n  - Follow-up\n  - Reply received\n• Format full conversation history for AI context.\n\nSTEP 3 — AI Message Generation\n• Gemini generates a personalized LinkedIn message.\n• Message adapts based on previous conversation.\n• Tone: Professional, human, non-salesy.\n\nSTEP 4 — Conversation Logging\n• Message is appended to recruiter_chats collection.\n• lastMessageAt and status are updated.\n• Conversation becomes state-aware and trackable.\n\nResult:\nA closed-loop system — from hiring detection to \nAI-driven personalized recruiter engagement.\n",
+        "height": 672,
+        "width": 480
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1456,
+        -976
+      ],
+      "typeVersion": 1,
+      "id": "1ce2a810-8054-4244-94f9-74d7130bb578",
+      "name": "Sticky Note2"
+    },
+    {
+      "parameters": {
+        "content": "## Linked API – Send Message Node\n\nUse the official n8n Linked API node to send LinkedIn messages.\nNote: Direct LinkedIn messaging API access is restricted for individual developers,\nso this depends on approved credentials/integration.\n",
+        "height": 272,
+        "width": 336,
+        "color": 3
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        2704,
+        -336
+      ],
+      "typeVersion": 1,
+      "id": "a8e3e0a6-d961-40d9-9fe3-2a77e7afbcb5",
+      "name": "Sticky Note3"
+    },
+    {
+      "parameters": {
+        "operation": "sendMessage",
+        "personUrl": "={{ $('Loop Over Items1').item.json.linkedin }}",
+        "messageText": "={{ $json.content.parts[0].text }}"
+      },
+      "type": "n8n-nodes-linked-api.linkedApi",
+      "typeVersion": 1,
+      "position": [
+        2512,
+        -336
+      ],
+      "id": "2c0ec6bc-bcf5-4d71-bb8e-fa10564cbd36",
+      "name": "Send message"
+    },
+    {
+      "parameters": {
+        "jsCode": "const recruiter = $json;\n\nlet messageText = recruiter.content?.parts?.[0]?.text || \"\";\n\nmessageText = messageText\n  .replace(/\\\\n/g, \"\\n\")\n  .replace(/\\n{3,}/g, \"\\n\\n\")\n  .trim();\n\n// Keep old messages\nconst existingMessages = $('Loop Over Items1').first().json.messages || [];\n\nreturn [\n  {\n    json: {\n      linkedin: $('Loop Over Items1').first().json.linkedin,\n      recruiterName:$('Loop Over Items1').first().json.name,\n\n      messages: [\n        ...existingMessages,\n        {\n          role: \"verifide\",\n          text: messageText,\n          sentAt: new Date().toISOString()\n        }\n      ],\n      status: \"contacted\",\n      lastMessageAt: new Date().toISOString(),\n      createdAt: recruiter.createdAt || new Date().toISOString()\n    }\n  }\n];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2304,
+        -224
+      ],
+      "id": "1f77ae92-862e-47a7-9fcf-6deb2a7b8ffa",
+      "name": "Code in JavaScript5"
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "collection": "recruiter_chats",
+        "updateKey": "linkedin",
+        "fields": "messages,status,lastMessageAt,createdAt,recruiterName",
+        "upsert": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.mongoDb",
+      "typeVersion": 1.2,
+      "position": [
+        2544,
+        -128
+      ],
+      "id": "296c7850-2bc3-45fe-8ad8-3a8afaf12bb1",
+      "name": "Update documents"
+    },
+    {
+      "parameters": {
+        "content": "## AI Conversation Monitoring & Automated Response Engine\n\nThis workflow monitors ongoing recruiter conversations and intelligently decides the next action.\n\nFlow:\n\n1. A scheduled trigger runs every 2 hours.\n2. It fetches all active recruiter conversations from the database.\n3. For each recruiter, the system syncs the latest LinkedIn messages.\n4. If the recruiter has replied (last message from \"them\"),\n   the conversation is sent to an AI decision engine.\n5. The AI analyzes intent and decides whether to:\n   - Create a meeting\n   - Ask for availability\n   - Send a follow-up\n   - Politely close the conversation\n6. If a meeting is required, a Google Calendar event is created.\n7. If a message is required, it is sent via Linked API.\n8. All actions are logged and conversation history is updated in MongoDB.\n\nThis creates a semi-autonomous recruiter engagement system.\n",
+        "height": 544,
+        "width": 688,
+        "color": 6
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -352,
+        688
+      ],
+      "typeVersion": 1,
+      "id": "3268dddf-b085-40b0-bef2-a60c9c7d5026",
+      "name": "Sticky Note4"
+    },
+    {
+      "parameters": {
+        "content": "## Conversation Sync (Linked API)\n\nThis node syncs the latest LinkedIn conversation\nfor each recruiter.\n\nNote:\nLinkedIn official messaging APIs are limited\nfor individual developers.\n\nSimulation nodes are used when API access\nis not available.\n",
+        "height": 304,
+        "width": 352,
+        "color": 3
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        64,
+        1600
+      ],
+      "typeVersion": 1,
+      "id": "aa7887e9-da34-4b5c-8011-1b402ebda726",
+      "name": "Sticky Note5"
+    },
+    {
+      "parameters": {
+        "content": "## LinkedIn Send Message\n\nThis node sends the AI-generated message\nto the recruiter.\n\nIf Linked API is unavailable,\nthis step is simulated for architecture design purposes.\n",
+        "height": 208,
+        "width": 336,
+        "color": 3
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        784,
+        848
+      ],
+      "typeVersion": 1,
+      "id": "83678751-0ff9-4e4c-bd68-6a7c490af3f1",
+      "name": "Sticky Note6"
+    },
+    {
+      "parameters": {
+        "content": "## AI Decision Engine (Gemini)\n\nThis model analyzes the recruiter's latest message\nand decides the next action.\n\nPossible Outcomes:\n- Create Google Calendar meeting\n- Suggest meeting time\n- Send follow-up message\n- Politely close conversation\n\nOnly ONE action is taken per cycle.\n",
+        "height": 320,
+        "width": 400,
+        "color": 3
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1248,
+        1680
+      ],
+      "typeVersion": 1,
+      "id": "6e4c485e-60b3-4a97-8c83-54c12b2166a8",
+      "name": "Sticky Note7"
+    },
+    {
+      "parameters": {
+        "content": "# AI Recruiter Conversation Intelligence & Meeting Automation Engine",
+        "height": 96,
+        "width": 1136,
+        "color": 6
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        224,
+        2064
+      ],
+      "typeVersion": 1,
+      "id": "568ec9bf-2e87-4411-b84b-102048cecb58",
+      "name": "Sticky Note8"
+    }
+  ],
+  "pinData": {
+    "Sync conversation": [
+      {
+        "json": {
+          "success": true,
+          "result": [
+            {
+              "personUrl": "https://www.linkedin.com/in/person1",
+              "since": "2023-01-01T00:00:00Z",
+              "type": "st",
+              "messages": [
+                {
+                  "id": "f4d92946-8821-6da6-ff4c-c36f0671292a",
+                  "sender": "us",
+                  "text": "Hello, how are you?",
+                  "time": "2023-01-02T10:30:00Z"
+                },
+                {
+                  "id": "2a1b7f25-daba-5e20-70e9-c6427bb4f660",
+                  "sender": "them",
+                  "text": "I'm doing well, thanks for asking!",
+                  "time": "2023-01-02T10:35:00Z"
+                }
+              ]
+            }
+          ]
+        }
+      }
+    ]
+  },
+  "connections": {
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Items": {
+      "main": [
+        [
+          {
+            "node": "Search1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Search",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Search": {
+      "main": [
+        [
+          {
+            "node": "Message a model",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Message a model": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript1": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Search1": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript2": {
+      "main": [
+        [
+          {
+            "node": "Find documents",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Find documents": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript3": {
+      "main": [
+        [
+          {
+            "node": "Insert documents",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Insert documents": {
+      "main": [
+        [
+          {
+            "node": "Find documents1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Find documents1": {
+      "main": [
+        [
+          {
+            "node": "Find documents2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Find documents2": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript4",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript4": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Items1": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Code in JavaScript6",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Message a model1": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript5",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript6": {
+      "main": [
+        [
+          {
+            "node": "Message a model1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Schedule Trigger2": {
+      "main": [
+        [
+          {
+            "node": "Find documents3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Find documents3": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Items2": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript8",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Code in JavaScript7",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sync conversation": {
+      "main": [
+        []
+      ]
+    },
+    "Code in JavaScript7": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript8": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Items3": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Code in JavaScript9",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript9": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create an event in Google Calendar": {
+      "ai_tool": [
+        [
+          {
+            "node": "Message a model2",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Message a model2": {
+      "main": [
+        []
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Code in JavaScript10",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript10": {
+      "main": [
+        [
+          {
+            "node": "Update documents1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields": {
+      "main": [
+        [
+          {
+            "node": "Update documents2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript5": {
+      "main": [
+        [
+          {
+            "node": "Update documents",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update documents": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "a4672737-9a83-4da6-bab3-670eb74d549f",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "fbf9679cae52357b7a2b014da2642c26dda3597f0b91a80da6e22eb6f5febd16"
+  },
+  "id": "t78Dc3EmaqP73iNVdWcef",
+  "tags": []
+}
