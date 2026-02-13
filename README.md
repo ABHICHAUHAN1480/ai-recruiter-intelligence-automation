@@ -22,18 +22,27 @@ An end-to-end AI-powered recruiter discovery and LinkedIn outreach automation sy
 
 ## ⚙ Nodes Used
 
-- Schedule Trigger
-- Code (JavaScript)
-- Tavily Search
-- Google Gemini (AI Model)
-- MongoDB (Insert, Find, Update)
-- Split In Batches
-- IF (Conditional Logic)
-- Linked API (Send Message, Sync Conversation)
-- Google Calendar Tool
-- Set / Edit Fields
+- Schedule Trigger  
+- Code (JavaScript)  
+- Tavily Search  
+- Google Gemini (AI Model)  
+- MongoDB (Insert, Find, Update)  
+- Split In Batches  
+- IF (Conditional Logic)  
+- Linked API (Send Message, Sync Conversation)  
+- Google Calendar Tool  
+- Set / Edit Fields  
 
 ---
+
+## 📸 Workflow Screenshots
+
+### Recruiter Database Structure
+![Recruiter DB](https://github.com/user-attachments/files/25283008/capture_20260213123826860.bmp)
+
+### Overall Workflow Architecture
+![Workflow Overview](https://github.com/user-attachments/files/25283005/capture_20260213124030022.bmp)
+
 
 ## 📁 File
 
@@ -41,7 +50,7 @@ An end-to-end AI-powered recruiter discovery and LinkedIn outreach automation sy
 
 ---
 
-## Note
+## ⚠ Note
 
 LinkedIn messaging APIs are restricted for individual developers.  
-Where direct API access is unavailable, simulation nodes are used for architectural design.
+Where direct API access is unavailable, simulation nodes are used for architectural demonstration.
