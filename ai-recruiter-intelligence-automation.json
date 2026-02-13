@@ -65,7 +65,6 @@
       ],
       "id": "f3c0e18b-8697-49b1-acc4-c01901cb9a97",
       "name": "Search"
-      
     },
     {
       "parameters": {
@@ -93,11 +92,10 @@
       ],
       "id": "8424ef70-64d9-4c8c-ad09-831accbad68c",
       "name": "Message a model"
-     
     },
     {
       "parameters": {
-        "jsCode": "const rawText = $json.content.parts[0].text;\n\n// Remove markdown fences\nconst withoutFences = rawText\n  .replace(/```json/g, '')\n  .replace(/```/g, '')\n  .trim();\n\n// 🔥 Extract ONLY the first JSON array using regex\nconst match = withoutFences.match(/\\[[\\s\\S]*\\]/);\n\nif (!match) {\n  throw new Error(\"No valid JSON array found in model output.\");\n}\n\nlet parsed;\n\ntry {\n  parsed = JSON.parse(match[0]);\n} catch (error) {\n  throw new Error(\"JSON parsing failed: \" + error.message);\n}\n\nreturn parsed.map(item => ({\n  json: item\n}));\n"
+        "jsCode": "const rawText = $json.content.parts[0].text;\n\n\nconst withoutFences = rawText\n  .replace(/```json/g, '')\n  .replace(/```/g, '')\n  .trim();\n\n\nconst match = withoutFences.match(/\\[[\\s\\S]*\\]/);\n\nif (!match) {\n  throw new Error(\"No valid JSON array found in model output.\");\n}\n\nlet parsed;\n\ntry {\n  parsed = JSON.parse(match[0]);\n} catch (error) {\n  throw new Error(\"JSON parsing failed: \" + error.message);\n}\n\nreturn parsed.map(item => ({\n  json: item\n}));\n"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -169,11 +167,12 @@
       "id": "4618f8ad-8244-46d3-8def-01d56d2a487c",
       "name": "Find documents",
       "alwaysOutputData": true,
+     
       "onError": "continueRegularOutput"
     },
     {
       "parameters": {
-        "jsCode": "// Get recruiter data from previous scoring node\nconst newData = $('Code in JavaScript2').all().map(item => item.json);\n\n// Get existing DB records (from MongoDB Find node)\nconst existingData = $input.all().map(item => item.json);\n\n// Create set of existing LinkedIn URLs\nconst existingLinkedins = new Set(\n  existingData.map(doc => doc.linkedin)\n);\n\n// Filter only profiles NOT already in DB\nconst filtered = newData.filter(profile =>\n  !existingLinkedins.has(profile.linkedin)\n);\n\n// Return only new ones\nreturn filtered.map(profile => ({\n  json: profile\n}));\n"
+        "jsCode": "\nconst newData = $('Code in JavaScript2').all().map(item => item.json);\n\n\nconst existingData = $input.all().map(item => item.json);\n\n\nconst existingLinkedins = new Set(\n  existingData.map(doc => doc.linkedin)\n);\n\n\nconst filtered = newData.filter(profile =>\n  !existingLinkedins.has(profile.linkedin)\n);\n\nreturn filtered.map(profile => ({\n  json: profile\n}));\n"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -227,12 +226,12 @@
       "name": "Find documents1",
       "executeOnce": false,
       "alwaysOutputData": true,
-      
+     
       "onError": "continueRegularOutput"
     },
     {
       "parameters": {
-        "jsCode": "// Recruiter data from first Mongo node (check1)\nconst recruiters = $('Find documents1').all().map(item => item.json);\n\n// Chat data from second Mongo node (recruiter_chats)\nconst chats = $input.all().map(item => item.json);\n\n// Create map for quick lookup by linkedin\nconst chatMap = new Map();\n\nfor (const chat of chats) {\n  if (chat.linkedin) {\n    chatMap.set(chat.linkedin, chat);\n  }\n}\n\n// Merge both datasets\nconst merged = recruiters.map(recruiter => {\n\n  const chatData = chatMap.get(recruiter.linkedin);\n\n  return {\n    json: {\n      ...recruiter,\n      messages: chatData?.messages || [],\n      conversationStatus: chatData?.status || \"no_conversation\",\n      lastMessageAt: chatData?.lastMessageAt || null\n    }\n  };\n});\n\nreturn merged;\n"
+        "jsCode": "\nconst recruiters = $('Find documents1').all().map(item => item.json);\n\nconst chats = $input.all().map(item => item.json);\n\nconst chatMap = new Map();\n\nfor (const chat of chats) {\n  if (chat.linkedin) {\n    chatMap.set(chat.linkedin, chat);\n  }\n}\n\n\nconst merged = recruiters.map(recruiter => {\n\n  const chatData = chatMap.get(recruiter.linkedin);\n\n  return {\n    json: {\n      ...recruiter,\n      messages: chatData?.messages || [],\n      conversationStatus: chatData?.status || \"no_conversation\",\n      lastMessageAt: chatData?.lastMessageAt || null\n    }\n  };\n});\n\nreturn merged;\n"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -276,7 +275,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const items = $input.all();\n\nreturn items.map(item => {\n\n  const data = item.json;\n  const messages = data.messages || [];\n\n  // Detect conversation stage\n  let conversationStage = \"first_outreach\";\n\n  if (messages.length > 0) {\n    const lastMessage = messages[messages.length - 1];\n\n    if (lastMessage.role === \"verifide\") {\n      conversationStage = \"follow_up\";\n    }\n\n    if (lastMessage.role === \"recruiter\") {\n      conversationStage = \"reply_received\";\n    }\n  }\n\n  // Format conversation history for AI\n  const formattedHistory = messages.length\n    ? messages\n        .map(m => `${m.role.toUpperCase()}: ${m.text}`)\n        .join(\"\\n\\n\")\n    : \"No previous conversation.\";\n\n  return {\n    json: {\n      ...data,\n      conversationStage,\n      formattedHistory,\n      lastMessageRole: messages.length\n        ? messages[messages.length - 1].role\n        : null,\n      totalMessages: messages.length\n    }\n  };\n});\n"
+        "jsCode": "const items = $input.all();\n\nreturn items.map(item => {\n\n  const data = item.json;\n  const messages = data.messages || [];\n\n\n  let conversationStage = \"first_outreach\";\n\n  if (messages.length > 0) {\n    const lastMessage = messages[messages.length - 1];\n\n    if (lastMessage.role === \"verifide\") {\n      conversationStage = \"follow_up\";\n    }\n\n    if (lastMessage.role === \"recruiter\") {\n      conversationStage = \"reply_received\";\n    }\n  }\n\n  // Format conversation history for AI\n  const formattedHistory = messages.length\n    ? messages\n        .map(m => `${m.role.toUpperCase()}: ${m.text}`)\n        .join(\"\\n\\n\")\n    : \"No previous conversation.\";\n\n  return {\n    json: {\n      ...data,\n      conversationStage,\n      formattedHistory,\n      lastMessageRole: messages.length\n        ? messages[messages.length - 1].role\n        : null,\n      totalMessages: messages.length\n    }\n  };\n});\n"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -363,12 +362,12 @@
     },
     {
       "parameters": {
-        "jsCode": "const items = $input.all();\n\nconst output = [];\n\nfor (const item of items) {\n  const data = item.json;\n\n  if (!data.result || !data.result.length) continue;\n\n  const conversation = data.result[0];\n  const messages = conversation.messages || [];\n\n  if (!messages.length) continue;\n\n  const lastMessage = messages[messages.length - 1];\n\n  // ✅ Select only when last message is from \"them\"\n  if (lastMessage.sender === \"them\") {\n    output.push({\n      json: data\n    });\n  }\n}\n\nreturn output;\n"
+        "jsCode": "const items = $input.all();\n\nconst output = [];\n\nfor (const item of items) {\n  const data = item.json;\n\n  if (!data.result || !data.result.length) continue;\n\n  const conversation = data.result[0];\n  const messages = conversation.messages || [];\n\n  if (!messages.length) continue;\n\n  const lastMessage = messages[messages.length - 1];\n\n\n  if (lastMessage.sender === \"them\") {\n    output.push({\n      json: data\n    });\n  }\n}\n\nreturn output;\n"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        512,
+        464,
         1184
       ],
       "id": "4aef3571-fad8-497e-b01f-fd32b104a87e",
@@ -390,7 +389,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const items = $input.all();\nconst output = [];\n\nfor (const item of items) {\n  const data = item.json;\n\n  if (!data.result || !data.result.length) continue;\n\n  const conversation = data.result[0];\n  const messages = conversation.messages || [];\n\n  if (!messages.length) continue;\n\n  const lastMessage = messages[messages.length - 1];\n\n  if (lastMessage.sender !== \"them\") continue;\n\n  // 🎲 Pure random 50/50 decision\n  const isMeeting = Math.random() < 0.5;\n\n  if (isMeeting) {\n\n    const startDate = new Date();\n    startDate.setDate(startDate.getDate() + 2);\n    startDate.setHours(15, 0, 0, 0);\n\n    const endDate = new Date(startDate);\n    endDate.setMinutes(endDate.getMinutes() + 30);\n\n    output.push({\n      json: {\n        action: \"create_meeting\",\n        personUrl: conversation.personUrl,\n        meeting: {\n          title: \"Introductory Discussion - Verifide\",\n          start: startDate.toISOString(),\n          end: endDate.toISOString(),\n          meetLink: \"https://meet.fake/verifide-demo\"\n        }\n      }\n    });\n\n  } else {\n\n    output.push({\n      json: {\n        action: \"send_message\",\n        personUrl: conversation.personUrl,\n        message:\n          \"I’d love to continue this conversation. Would sometime later this week work for a quick 20–30 minute call?\"\n      }\n    });\n\n  }\n}\n\nreturn output;\n"
+        "jsCode": "const items = $input.all();\nconst output = [];\n\nfor (const item of items) {\n  const data = item.json;\n\n  if (!data.result || !data.result.length) continue;\n\n  const conversation = data.result[0];\n  const messages = conversation.messages || [];\n\n  if (!messages.length) continue;\n\n  const lastMessage = messages[messages.length - 1];\n\n  if (lastMessage.sender !== \"them\") continue;\n\n  const isMeeting = Math.random() < 0.5;\n\n  if (isMeeting) {\n\n    const startDate = new Date();\n    startDate.setDate(startDate.getDate() + 2);\n    startDate.setHours(15, 0, 0, 0);\n\n    const endDate = new Date(startDate);\n    endDate.setMinutes(endDate.getMinutes() + 30);\n\n    output.push({\n      json: {\n        action: \"create_meeting\",\n        personUrl: conversation.personUrl,\n        meeting: {\n          title: \"Introductory Discussion - Verifide\",\n          start: startDate.toISOString(),\n          end: endDate.toISOString(),\n          meetLink: \"https://meet.fake/verifide-demo\"\n        }\n      }\n    });\n\n  } else {\n\n    output.push({\n      json: {\n        action: \"send_message\",\n        personUrl: conversation.personUrl,\n        message:\n          \"I’d love to continue this conversation. Would sometime later this week work for a quick 20–30 minute call?\"\n      }\n    });\n\n  }\n}\n\nreturn output;\n"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -519,7 +518,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const items = $input.all();\nconst output = [];\n\n// Get all previous chats\nconst previousChats = $('Find documents3').all().map(i => i.json);\n\n// Create lookup map by linkedin\nconst chatMap = new Map();\nfor (const chat of previousChats) {\n  chatMap.set(chat.linkedin, chat);\n}\n\nfor (const item of items) {\n\n  const data = item.json;\n\n  if (data.action !== \"send_message\") continue;\n\n  const previousChat = chatMap.get(data.personUrl) || {};\n  const previousMessages = previousChat.messages || [];\n\n  output.push({\n    json: {\n      linkedin: data.personUrl,\n      recruiterName: previousChat.recruiterName || \"\",\n      createdAt: previousChat.createdAt || new Date().toISOString(),\n      lastMessageAt: new Date().toISOString(),\n      status: \"contacted\",\n      messages: [\n        ...previousMessages,\n        {\n          role: \"verifide\",\n          text: data.message,\n          sentAt: new Date().toISOString()\n        }\n      ]\n    }\n  });\n\n}\n\nreturn output;\n"
+        "jsCode": "const items = $input.all();\nconst output = [];\n\nconst previousChats = $('Find documents3').all().map(i => i.json);\n\nconst chatMap = new Map();\nfor (const chat of previousChats) {\n  chatMap.set(chat.linkedin, chat);\n}\n\nfor (const item of items) {\n\n  const data = item.json;\n\n  if (data.action !== \"send_message\") continue;\n\n  const previousChat = chatMap.get(data.personUrl) || {};\n  const previousMessages = previousChat.messages || [];\n\n  output.push({\n    json: {\n      linkedin: data.personUrl,\n      recruiterName: previousChat.recruiterName || \"\",\n      createdAt: previousChat.createdAt || new Date().toISOString(),\n      lastMessageAt: new Date().toISOString(),\n      status: \"contacted\",\n      messages: [\n        ...previousMessages,\n        {\n          role: \"verifide\",\n          text: data.message,\n          sentAt: new Date().toISOString()\n        }\n      ]\n    }\n  });\n\n}\n\nreturn output;\n"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -654,7 +653,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const recruiter = $json;\n\nlet messageText = recruiter.content?.parts?.[0]?.text || \"\";\n\nmessageText = messageText\n  .replace(/\\\\n/g, \"\\n\")\n  .replace(/\\n{3,}/g, \"\\n\\n\")\n  .trim();\n\n// Keep old messages\nconst existingMessages = $('Loop Over Items1').first().json.messages || [];\n\nreturn [\n  {\n    json: {\n      linkedin: $('Loop Over Items1').first().json.linkedin,\n      recruiterName:$('Loop Over Items1').first().json.name,\n\n      messages: [\n        ...existingMessages,\n        {\n          role: \"verifide\",\n          text: messageText,\n          sentAt: new Date().toISOString()\n        }\n      ],\n      status: \"contacted\",\n      lastMessageAt: new Date().toISOString(),\n      createdAt: recruiter.createdAt || new Date().toISOString()\n    }\n  }\n];\n"
+        "jsCode": "const recruiter = $json;\n\nlet messageText = recruiter.content?.parts?.[0]?.text || \"\";\n\nmessageText = messageText\n  .replace(/\\\\n/g, \"\\n\")\n  .replace(/\\n{3,}/g, \"\\n\\n\")\n  .trim();\n\nconst existingMessages = $('Loop Over Items1').first().json.messages || [];\n\nreturn [\n  {\n    json: {\n      linkedin: $('Loop Over Items1').first().json.linkedin,\n      recruiterName:$('Loop Over Items1').first().json.name,\n\n      messages: [\n        ...existingMessages,\n        {\n          role: \"verifide\",\n          text: messageText,\n          sentAt: new Date().toISOString()\n        }\n      ],\n      status: \"contacted\",\n      lastMessageAt: new Date().toISOString(),\n      createdAt: recruiter.createdAt || new Date().toISOString()\n    }\n  }\n];\n"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -681,7 +680,13 @@
         -128
       ],
       "id": "296c7850-2bc3-45fe-8ad8-3a8afaf12bb1",
-      "name": "Update documents"
+      "name": "Update documents",
+      "credentials": {
+        "mongoDb": {
+          "id": "ddZBYcvH14RuqrpB",
+          "name": "MongoDB account"
+        }
+      }
     },
     {
       "parameters": {
@@ -701,8 +706,8 @@
     },
     {
       "parameters": {
-        "content": "## Conversation Sync (Linked API)\n\nThis node syncs the latest LinkedIn conversation\nfor each recruiter.\n\nNote:\nLinkedIn official messaging APIs are limited\nfor individual developers.\n\nSimulation nodes are used when API access\nis not available.\n",
-        "height": 304,
+        "content": "## Conversation Sync (Linked API)\n\nThis node syncs the latest LinkedIn conversation\nfor each recruiter.\n\nNote:\nLinkedIn official messaging APIs are limited\nfor individual developers.\n\nSimulation nodes are used when API access\nis not available.\nrefrence:https://linkedapi.io/docs/working-with-conversations/",
+        "height": 320,
         "width": 352,
         "color": 3
       },
@@ -1171,7 +1176,7 @@
     "binaryMode": "separate",
     "availableInMCP": false
   },
-  "versionId": "a4672737-9a83-4da6-bab3-670eb74d549f",
+  "versionId": "999f5072-4167-4ffe-b5f2-4cad9ed957c0",
   "meta": {
     "templateCredsSetupCompleted": true,
     "instanceId": "fbf9679cae52357b7a2b014da2642c26dda3597f0b91a80da6e22eb6f5febd16"
